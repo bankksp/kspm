@@ -1,7 +1,7 @@
-
 import React, { useState } from 'react';
 import SearchInput from '../components/SearchInput';
 import CertificateCard from '../components/CertificateCard';
+import CertificateModal from '../components/CertificateModal';
 import { fetchCertificates } from '../services/googleDrive';
 import type { Certificate } from '../types';
 import { SearchIcon } from '../components/icons/SearchIcon';
@@ -13,6 +13,7 @@ const SearchPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +40,15 @@ const SearchPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+  
+  const handleOpenModal = (certificate: Certificate) => {
+    setSelectedCertificate(certificate);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedCertificate(null);
+  };
+
 
   const renderResults = () => {
     if (isLoading) {
@@ -66,7 +76,12 @@ const SearchPage: React.FC = () => {
       return results.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {results.map((cert, index) => (
-            <CertificateCard key={cert.id} certificate={cert} staggerDelay={index * 50} />
+            <CertificateCard 
+              key={cert.id} 
+              certificate={cert} 
+              staggerDelay={index * 50} 
+              onCardClick={handleOpenModal}
+            />
           ))}
         </div>
       ) : (
@@ -92,25 +107,30 @@ const SearchPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto max-w-4xl text-center px-4">
-      <div className="pt-8 pb-12">
-        <h1 className="text-4xl sm:text-5xl font-bold text-white mb-2">ค้นหาเกียรติบัตร</h1>
-        <p className="text-lg text-slate-300">กรอกชื่อ-นามสกุลที่ปรากฏบนเกียรติบัตรเพื่อค้นหา</p>
-      </div>
-      
-      <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-12 flex gap-2">
-        <SearchInput
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="เช่น สมชาย ใจดี"
-        />
-        <button type="submit" disabled={isLoading} className="bg-sky-500 text-white font-semibold px-6 py-2 rounded-full hover:bg-sky-600 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center">
-            {isLoading ? '...' : 'ค้นหา'}
-        </button>
-      </form>
+    <>
+      <div className="container mx-auto max-w-4xl text-center px-4">
+        <div className="pt-8 pb-12">
+          <h1 className="text-4xl sm:text-5xl font-bold text-white mb-2">ค้นหาเกียรติบัตร</h1>
+          <p className="text-lg text-slate-300">กรอกชื่อ-นามสกุลที่ปรากฏบนเกียรติบัตรเพื่อค้นหา</p>
+        </div>
+        
+        <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-12 flex gap-2">
+          <SearchInput
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="เช่น สมชาย ใจดี"
+          />
+          <button type="submit" disabled={isLoading} className="bg-sky-500 text-white font-semibold px-6 py-2 rounded-full hover:bg-sky-600 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center">
+              {isLoading ? '...' : 'ค้นหา'}
+          </button>
+        </form>
 
-      {renderResults()}
-    </div>
+        {renderResults()}
+      </div>
+      {selectedCertificate && (
+        <CertificateModal certificate={selectedCertificate} onClose={handleCloseModal} />
+      )}
+    </>
   );
 };
 

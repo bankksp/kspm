@@ -1,13 +1,12 @@
-
 import React, { useState } from 'react';
 import type { Certificate } from '../types';
-import { DownloadIcon } from './icons/DownloadIcon';
 import { Position } from '../types';
 import { ImageIcon } from './icons/ImageIcon';
 
 interface CertificateCardProps {
   certificate: Certificate;
   staggerDelay: number;
+  onCardClick: (certificate: Certificate) => void;
 }
 
 const positionColorMap: Record<Position, string> = {
@@ -16,7 +15,7 @@ const positionColorMap: Record<Position, string> = {
   [Position.Director]: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
 };
 
-const CertificateCard: React.FC<CertificateCardProps> = ({ certificate, staggerDelay }) => {
+const CertificateCard: React.FC<CertificateCardProps> = ({ certificate, staggerDelay, onCardClick }) => {
   const [imageError, setImageError] = useState(false);
 
   const handleImageError = () => {
@@ -25,8 +24,11 @@ const CertificateCard: React.FC<CertificateCardProps> = ({ certificate, staggerD
 
   return (
     <div 
-      className="group relative overflow-hidden rounded-lg bg-slate-800/50 shadow-lg transition-all duration-300 hover:shadow-cyan-500/20 hover:scale-[1.03] border border-slate-700 hover:border-sky-500/50 card-animate"
+      onClick={() => onCardClick(certificate)}
+      className="group relative overflow-hidden rounded-lg bg-slate-800/50 shadow-lg transition-all duration-300 hover:shadow-cyan-500/20 hover:scale-[1.03] border border-slate-700 hover:border-sky-500/50 card-animate cursor-pointer"
       style={{ animationDelay: `${staggerDelay}ms`, opacity: 0 }}
+      role="button"
+      aria-label={`ดูรายละเอียดเกียรติบัตรของ ${certificate.name}`}
     >
       <div className="w-full h-48 bg-slate-700/50">
         {imageError ? (
@@ -55,17 +57,6 @@ const CertificateCard: React.FC<CertificateCardProps> = ({ certificate, staggerD
           {certificate.position}
         </span>
       </div>
-      
-      <a
-        href={certificate.fileUrl}
-        download
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 bg-slate-700/50 rounded-full text-slate-300 opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-sky-500 hover:text-white hover:scale-110"
-        aria-label="ดาวน์โหลด"
-      >
-        <DownloadIcon className="w-5 h-5" />
-      </a>
     </div>
   );
 };

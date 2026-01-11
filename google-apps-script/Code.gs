@@ -1,4 +1,3 @@
-
 // Enum-like object for positions
 const Position = {
   Teacher: 'ครู',
@@ -24,8 +23,20 @@ function doGet(e) {
     let certificates;
 
     if (query && query.trim() !== '') {
-      // For search, use the robust Base64 method to ensure images display.
-      certificates = searchCertificatesByText(query);
+      // For search, use the robust Base64 method with caching to ensure images display.
+      const cache = CacheService.getScriptCache();
+      const cacheKey = `search_${query.trim().toLowerCase()}`;
+      const cached = cache.get(cacheKey);
+
+      if (cached) {
+        // If found in cache, return the cached result immediately.
+        return createJsonResponse(JSON.parse(cached));
+      } else {
+        // If not in cache, perform the search.
+        certificates = searchCertificatesByText(query);
+        // Store the result in cache for 10 minutes (600 seconds).
+        cache.put(cacheKey, JSON.stringify(certificates), 600);
+      }
     } else {
       // For browsing all, use efficient thumbnail links.
       certificates = fetchAllCertificates();
@@ -33,7 +44,8 @@ function doGet(e) {
     
     return createJsonResponse(certificates);
       
-  } catch (error) {
+  } catch (error)
+ {
     console.error(`Error in doGet: ${error.toString()}\nStack: ${error.stack}`);
     return createJsonResponse({ 
       error: 'An error occurred on the server.', 
@@ -54,7 +66,7 @@ function createJsonResponse(data) {
 }
 
 /**
- * Fetches all certificate files and processes them to use thumbnail URLs.
+ * Fetches all certificate files and processes them to use thumbnail URLs for speed.
  * @returns {Array<object>} An array of all certificate objects.
  */
 function fetchAllCertificates() {
@@ -65,8 +77,8 @@ function fetchAllCertificates() {
     const files = folder.getFilesByType(MimeType.PNG);
     
     while (files.hasNext()) {
-      // `true` indicates to use Base64 encoding to avoid CORS issues.
-      allCertificates.push(processFile(files.next(), position, true));
+      // `false` indicates to use thumbnail links for efficiency.
+      allCertificates.push(processFile(files.next(), position, false));
     }
   }
   return allCertificates;
@@ -94,7 +106,7 @@ function searchCertificatesByText(query) {
       const file = files.next();
       const parentFolderId = file.getParents().next().getId();
       const position = positionMap[parentFolderId] || 'ไม่ระบุ';
-      // `true` indicates to use Base64 encoding for search results.
+      // `true` indicates to use Base64 encoding for search results for maximum compatibility.
       certificates.push(processFile(file, position, true));
   }
   return certificates;
