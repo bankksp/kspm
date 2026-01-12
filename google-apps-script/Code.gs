@@ -1,3 +1,4 @@
+
 // Enum-like object for positions
 const Position = {
   Teacher: 'ครู',
@@ -14,51 +15,45 @@ const DRIVE_FOLDER_IDS = {
 
 /**
  * Handles HTTP GET requests.
- * If a 'query' is present, it searches and returns results with Base64 image data.
- * Otherwise, it fetches all certificates with thumbnail URLs for efficiency.
  */
 function doGet(e) {
   try {
     const query = e.parameter.query;
-    let certificates;
 
+    // If there is a search query, perform a server-side search (no caching for search results)
     if (query && query.trim() !== '') {
-      // For search, use the robust Base64 method with caching to ensure images display.
-      const cache = CacheService.getScriptCache();
-      const cacheKey = `search_${query.trim().toLowerCase()}`;
-      const cached = cache.get(cacheKey);
+      const searchResults = searchCertificates(query);
+      return createJsonResponse(searchResults);
+    }
 
-      if (cached) {
-        // If found in cache, return the cached result immediately.
-        return createJsonResponse(JSON.parse(cached));
-      } else {
-        // If not in cache, perform the search.
-        certificates = searchCertificatesByText(query);
-        // Store the result in cache for 10 minutes (600 seconds).
-        cache.put(cacheKey, JSON.stringify(certificates), 600);
-      }
-    } else {
-      // For browsing all, use efficient thumbnail links.
-      certificates = fetchAllCertificates();
+    // If no query (Browse All), use cache
+    const cache = CacheService.getScriptCache();
+    const cacheKey = 'all_certificates_v4'; // Bump version
+    const cached = cache.get(cacheKey);
+
+    if (cached) {
+      return createJsonResponse(JSON.parse(cached));
+    }
+
+    const certificates = fetchAllCertificates();
+    
+    try {
+      cache.put(cacheKey, JSON.stringify(certificates), 600); // 10 minutes
+    } catch(err) {
+      console.warn("Cache write failed: " + err);
     }
     
     return createJsonResponse(certificates);
       
-  } catch (error)
- {
-    console.error(`Error in doGet: ${error.toString()}\nStack: ${error.stack}`);
+  } catch (error) {
+    console.error(`Error in doGet: ${error.toString()}`);
     return createJsonResponse({ 
-      error: 'An error occurred on the server.', 
+      error: 'Server Error', 
       details: error.toString() 
     });
   }
 }
 
-/**
- * Creates a JSON response object.
- * @param {object} data - The data to stringify.
- * @returns {ContentService.TextOutput} The JSON response.
- */
 function createJsonResponse(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
@@ -66,99 +61,86 @@ function createJsonResponse(data) {
 }
 
 /**
- * Fetches all certificate files and processes them to use thumbnail URLs for speed.
- * @returns {Array<object>} An array of all certificate objects.
+ * Searches for files containing the query text within specific folders.
+ * Uses 'fullText' to search content (OCR) and metadata.
  */
-function fetchAllCertificates() {
-  const allCertificates = [];
+function searchCertificates(query) {
+  const results = [];
+  // Escape single quotes for the query string
+  const sanitizedQuery = query.replace(/'/g, "\\'");
+  
+  // Search logic: Content contains query OR Name contains query
+  // Note: 'fullText' includes the file content (indexable text) and title.
+  const searchParams = `fullText contains '${sanitizedQuery}' and trashed = false`;
+
   for (const position in DRIVE_FOLDER_IDS) {
-    const folderId = DRIVE_FOLDER_IDS[position];
-    const folder = DriveApp.getFolderById(folderId);
-    const files = folder.getFilesByType(MimeType.PNG);
-    
-    while (files.hasNext()) {
-      // `false` indicates to use thumbnail links for efficiency.
-      allCertificates.push(processFile(files.next(), position, false));
+    try {
+      const folderId = DRIVE_FOLDER_IDS[position];
+      const folder = DriveApp.getFolderById(folderId);
+      const files = folder.searchFiles(searchParams);
+      
+      while (files.hasNext()) {
+        const file = files.next();
+        const mimeType = file.getMimeType();
+         // Filter only images and PDFs
+        if (mimeType.indexOf('image/') === 0 || mimeType === MimeType.PDF) {
+           results.push(processFile(file, position));
+        }
+      }
+    } catch (e) {
+      console.error(`Error searching folder ${position}: ${e}`);
     }
   }
+  
+  // Sort by name
+  results.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+  return results;
+}
+
+function fetchAllCertificates() {
+  const allCertificates = [];
+  
+  for (const position in DRIVE_FOLDER_IDS) {
+    const folderId = DRIVE_FOLDER_IDS[position];
+    try {
+      const folder = DriveApp.getFolderById(folderId);
+      const files = folder.getFiles(); 
+      
+      while (files.hasNext()) {
+        const file = files.next();
+        const mimeType = file.getMimeType();
+        
+        if (mimeType.indexOf('image/') === 0 || mimeType === MimeType.PDF) {
+          allCertificates.push(processFile(file, position));
+        }
+      }
+    } catch (e) {
+      console.error(`Error processing folder ${position}: ${e}`);
+    }
+  }
+  
+  allCertificates.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+  
   return allCertificates;
 }
 
-/**
- * Searches for certificates and processes them to use Base64 data URLs.
- * The search now includes both full text (image content) and the file name.
- * @param {string} query - The text to search for.
- * @returns {Array<object>} An array of matching certificate objects.
- */
-function searchCertificatesByText(query) {
-  const folderIds = Object.values(DRIVE_FOLDER_IDS);
-  const positionMap = Object.entries(DRIVE_FOLDER_IDS).reduce((acc, [pos, id]) => {
-      acc[id] = pos;
-      return acc;
-  }, {});
-
-  // Sanitize query to handle single quotes in names (e.g., O'Malley)
-  const sanitizedQuery = query.replace(/'/g, "\\'");
-
-  const parentQuery = folderIds.map(id => `'${id}' in parents`).join(' or ');
-  // Updated query to search in both file name and full text content
-  const searchQuery = `(fullText contains '${sanitizedQuery}' or name contains '${sanitizedQuery}') and (${parentQuery}) and mimeType = 'image/png' and trashed = false`;
-  
-  const files = DriveApp.searchFiles(searchQuery);
-  const certificates = [];
-  
-  while(files.hasNext()) {
-      const file = files.next();
-      const parentFolderId = file.getParents().next().getId();
-      const position = positionMap[parentFolderId] || 'ไม่ระบุ';
-      // `true` indicates to use Base64 encoding for search results for maximum compatibility.
-      certificates.push(processFile(file, position, true));
-  }
-  return certificates;
-}
-
-
-/**
- * Processes a Drive file into a structured certificate object.
- * @param {Drive.File} file - The file object from Drive.
- * @param {string} position - The position associated with the certificate.
- * @param {boolean} useBase64 - If true, returns a Base64 data URL for the thumbnail.
- * @returns {object} A structured certificate object.
- */
-function processFile(file, position, useBase64) {
+function processFile(file, position) {
   const fileId = file.getId();
-  let thumbnailUrl;
-
-  if (useBase64) {
-    try {
-      const blob = file.getBlob();
-      const bytes = blob.getBytes();
-      const base64Data = Utilities.base64Encode(bytes);
-      thumbnailUrl = `data:image/png;base64,${base64Data}`;
-    } catch (e) {
-      console.error(`Base64 encoding failed for file ID: ${fileId}. Error: ${e.toString()}`);
-      // Fallback to the thumbnail link if Base64 fails.
-      thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w512-h512`;
-    }
-  } else {
-    // For "Browse All", use the standard, more efficient thumbnail link.
-    thumbnailUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w512-h512`;
-  }
+  const name = cleanFileName(file.getName());
 
   return {
     id: fileId,
-    name: cleanFileName(file.getName()),
+    name: name,
     position: position,
-    thumbnailUrl: thumbnailUrl,
+    thumbnailUrl: `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`, 
     fileUrl: `https://drive.google.com/uc?export=download&id=${fileId}`,
   };
 }
 
-/**
- * Cleans the file name by removing the .png extension.
- * @param {string} fileName - The original file name.
- * @returns {string} The cleaned file name.
- */
 function cleanFileName(fileName) {
-  return fileName.substring(0, fileName.lastIndexOf('.png')) || fileName;
+  const lastDotIndex = fileName.lastIndexOf('.');
+  if (lastDotIndex !== -1) {
+    return fileName.substring(0, lastDotIndex);
+  }
+  return fileName;
 }

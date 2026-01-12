@@ -1,21 +1,43 @@
-import React, { useState, useMemo } from 'react';
+
+import React, { useState, useMemo, useEffect } from 'react';
 import CertificateCard from '../components/CertificateCard';
 import CertificateModal from '../components/CertificateModal';
 import FilterPills from '../components/FilterPills';
+import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorMessage from '../components/ErrorMessage';
+import { fetchCertificates } from '../services/googleDrive';
 import { POSITIONS } from '../constants';
 import { Position } from '../types';
 import type { Certificate } from '../types';
 import { CertificateIcon } from '../components/icons/CertificateIcon';
 
-interface BrowsePageProps {
-  certificates: Certificate[];
-}
-
-
-const BrowsePage: React.FC<BrowsePageProps> = ({ certificates }) => {
+const BrowsePage: React.FC = () => {
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<'ทั้งหมด' | Position>('ทั้งหมด');
   const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
 
+  useEffect(() => {
+    const loadAllCertificates = async () => {
+      try {
+        setLoading(true);
+        // Fetch without query to get all
+        const data = await fetchCertificates();
+        setCertificates(data);
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError('เกิดข้อผิดพลาดในการโหลดข้อมูล');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAllCertificates();
+  }, []);
 
   const handleFilterChange = (filter: 'ทั้งหมด' | Position) => {
     setActiveFilter(filter);
@@ -55,13 +77,16 @@ const BrowsePage: React.FC<BrowsePageProps> = ({ certificates }) => {
   
   const filterOptions: ('ทั้งหมด' | Position)[] = ['ทั้งหมด', ...POSITIONS];
 
+  if (loading) return <div className="h-[60vh] flex items-center justify-center"><LoadingSpinner /></div>;
+  if (error) return <ErrorMessage message={error} />;
+
   return (
     <>
       <div className="container mx-auto px-4">
-        <div className="text-center pt-8 pb-12">
-          <h1 className="text-4xl sm:text-5xl font-bold text-white mb-2">คลังเกียรติบัตรโรงเรียน</h1>
+        <div className="text-center pt-8 pb-10">
+          <h1 className="text-3xl sm:text-5xl font-bold text-white mb-3">คลังเกียรติบัตรทั้งหมด</h1>
           <p className="text-lg text-slate-300">
-            เลือกดูเกียรติบัตรทั้งหมดของโรงเรียน ({certificates.length} รายการ)
+            รวบรวมเกียรติบัตรทั้งหมดของบุคลากรโรงเรียนกาฬสินธุ์ปัญญานุกูล
           </p>
         </div>
 
@@ -73,7 +98,7 @@ const BrowsePage: React.FC<BrowsePageProps> = ({ certificates }) => {
         />
 
         {filteredCertificates.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 animate-fade-in-up">
             {filteredCertificates.map((cert, index) => (
               <CertificateCard 
                 key={cert.id} 
@@ -84,7 +109,7 @@ const BrowsePage: React.FC<BrowsePageProps> = ({ certificates }) => {
             ))}
           </div>
         ) : (
-          <div className="mt-16 text-center text-slate-400">
+          <div className="mt-16 text-center text-slate-400 animate-fade-in-up">
               <div className="inline-block p-5 bg-slate-800/50 rounded-full mb-4">
                 <CertificateIcon className="h-12 w-12 text-slate-500"/>
               </div>
@@ -92,12 +117,6 @@ const BrowsePage: React.FC<BrowsePageProps> = ({ certificates }) => {
                   {activeFilter === 'ทั้งหมด' 
                       ? 'ไม่พบเกียรติบัตรในระบบ' 
                       : `ไม่พบเกียรติบัตรสำหรับตำแหน่ง "${activeFilter}"`
-                  }
-              </p>
-              <p className="text-slate-300 mt-1">
-                  {activeFilter === 'ทั้งหมด'
-                      ? 'โปรดตรวจสอบ Google Drive หรือติดต่อผู้ดูแลระบบ'
-                      : 'ลองเลือกตำแหน่งอื่นเพื่อค้นหา'
                   }
               </p>
           </div>
