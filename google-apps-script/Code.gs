@@ -18,7 +18,29 @@ const DRIVE_FOLDER_IDS = {
  */
 function doGet(e) {
   try {
-    const query = e.parameter.query;
+    const params = e.parameter;
+    const action = params.action;
+
+    // --- NEW: Handle Maintenance Status ---
+    
+    // 1. Get Maintenance Status
+    if (action === 'getMaintenanceStatus') {
+      const props = PropertiesService.getScriptProperties();
+      // Default to 'false' if not set
+      const status = props.getProperty('MAINTENANCE_MODE') === 'true';
+      return createJsonResponse({ maintenance: status });
+    }
+
+    // 2. Set Maintenance Status
+    if (action === 'setMaintenanceStatus') {
+      const mode = params.mode; // 'true' or 'false'
+      PropertiesService.getScriptProperties().setProperty('MAINTENANCE_MODE', mode);
+      return createJsonResponse({ success: true, maintenance: mode === 'true' });
+    }
+
+    // --- End Maintenance Logic ---
+
+    const query = params.query;
 
     // If there is a search query, perform a server-side search (no caching for search results)
     if (query && query.trim() !== '') {
@@ -28,7 +50,7 @@ function doGet(e) {
 
     // If no query (Browse All), use cache
     const cache = CacheService.getScriptCache();
-    const cacheKey = 'all_certificates_v4'; // Bump version
+    const cacheKey = 'all_certificates_v5'; // Bump version
     const cached = cache.get(cacheKey);
 
     if (cached) {

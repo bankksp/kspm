@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { SettingsIcon } from '../components/icons/SettingsIcon';
 import { LockIcon } from '../components/icons/LockIcon';
+import { updateMaintenanceStatus } from '../services/googleDrive';
 
 interface AdminPageProps {
   isMaintenanceMode: boolean;
@@ -12,6 +13,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ isMaintenanceMode, setMaintenance
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,11 +26,28 @@ const AdminPage: React.FC<AdminPageProps> = ({ isMaintenanceMode, setMaintenance
     }
   };
 
-  const handleToggle = () => {
+  const handleToggle = async () => {
+    if (isUpdating) return;
+    
+    setIsUpdating(true);
     const newValue = !isMaintenanceMode;
-    setMaintenanceMode(newValue);
-    // Persist to localStorage to simulate backend setting
-    localStorage.setItem('maintenance_mode', String(newValue));
+    
+    try {
+      // 1. Update Server
+      const success = await updateMaintenanceStatus(newValue);
+      
+      if (success) {
+        // 2. Update Local State only if server update succeeded
+        setMaintenanceMode(newValue);
+      } else {
+        alert('เกิดข้อผิดพลาดในการบันทึกสถานะ');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้');
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -83,9 +102,10 @@ const AdminPage: React.FC<AdminPageProps> = ({ isMaintenanceMode, setMaintenance
           
           <button
             onClick={handleToggle}
+            disabled={isUpdating}
             className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-900 ${
               isMaintenanceMode ? 'bg-sky-500' : 'bg-slate-600'
-            }`}
+            } ${isUpdating ? 'opacity-50 cursor-wait' : ''}`}
           >
             <span
               className={`${
@@ -100,7 +120,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ isMaintenanceMode, setMaintenance
               <div className="flex items-center gap-3">
                  <div className={`w-3 h-3 rounded-full ${isMaintenanceMode ? 'bg-sky-500 animate-pulse' : 'bg-green-500'}`}></div>
                  <span className={`font-medium ${isMaintenanceMode ? 'text-sky-300' : 'text-green-400'}`}>
-                    สถานะปัจจุบัน: {isMaintenanceMode ? 'กำลังปิดปรับปรุง' : 'ใช้งานปกติ (ออนไลน์)'}
+                    สถานะปัจจุบัน: {isUpdating ? 'กำลังบันทึกข้อมูล...' : (isMaintenanceMode ? 'กำลังปิดปรับปรุง (มีผลกับทุกเครื่อง)' : 'ใช้งานปกติ (ออนไลน์)')}
                  </span>
               </div>
            </div>

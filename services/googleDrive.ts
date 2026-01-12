@@ -35,3 +35,33 @@ export async function fetchCertificates(query?: string): Promise<Certificate[]> 
     throw error; // Re-throw other errors
   }
 }
+
+/**
+ * Fetches the current maintenance status from the server.
+ */
+export async function fetchMaintenanceStatus(): Promise<boolean> {
+  const url = `${APPS_SCRIPT_URL}?action=getMaintenanceStatus`;
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    return data.maintenance === true;
+  } catch (error) {
+    console.warn("Failed to fetch maintenance status, defaulting to false", error);
+    return false;
+  }
+}
+
+/**
+ * Updates the maintenance status on the server.
+ */
+export async function updateMaintenanceStatus(status: boolean): Promise<boolean> {
+  const url = `${APPS_SCRIPT_URL}?action=setMaintenanceStatus&mode=${status}`;
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    return data.success === true;
+  } catch (error) {
+    console.error("Failed to update maintenance status", error);
+    throw new Error("ไม่สามารถบันทึกสถานะไปยังเซิร์ฟเวอร์ได้");
+  }
+}

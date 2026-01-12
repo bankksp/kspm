@@ -7,19 +7,42 @@ import BrowsePage from './pages/BrowsePage';
 import AdminPage from './pages/AdminPage';
 import Footer from './components/Footer';
 import MaintenancePage from './components/MaintenancePage';
+import { fetchMaintenanceStatus } from './services/googleDrive';
+import LoadingSpinner from './components/LoadingSpinner';
 
 const App: React.FC = () => {
-  // Check local storage for persistent state simulation
-  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(() => {
-    const savedMode = localStorage.getItem('maintenance_mode');
-    return savedMode === 'true';
-  });
+  // Initialize with null to indicate "loading" state, or false as default
+  const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(false);
+  const [isLoadingStatus, setIsLoadingStatus] = useState<boolean>(true);
 
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith('/admin');
 
+  // Fetch Global Maintenance Status on Load
+  useEffect(() => {
+    const checkMaintenance = async () => {
+      try {
+        const status = await fetchMaintenanceStatus();
+        setIsMaintenanceMode(status);
+      } catch (e) {
+        console.error("Error checking maintenance mode", e);
+      } finally {
+        setIsLoadingStatus(false);
+      }
+    };
+    checkMaintenance();
+  }, []);
+
+  // Show a simple loading screen while checking status to prevent flash
+  if (isLoadingStatus) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-slate-400">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
   // If maintenance mode is active AND user is not on admin page, show Maintenance Screen
-  // We render MaintenancePage completely separately to hide Header/Footer
   if (isMaintenanceMode && !isAdminRoute) {
     return (
       <React.StrictMode>
