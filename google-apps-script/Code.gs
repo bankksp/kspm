@@ -1,4 +1,3 @@
-
 // Enum-like object for positions
 const Position = {
   Teacher: 'ครู',
@@ -50,7 +49,7 @@ function doGet(e) {
 
     // If no query (Browse All), use cache
     const cache = CacheService.getScriptCache();
-    const cacheKey = 'all_certificates_v5'; // Bump version
+    const cacheKey = 'all_certificates_v6'; // Bump version
     const cached = cache.get(cacheKey);
 
     if (cached) {
@@ -84,30 +83,24 @@ function createJsonResponse(data) {
 
 /**
  * Searches for files containing the query text within specific folders.
- * Uses 'fullText' to search content (OCR) and metadata.
+ * Uses 'fullText contains' to search inside file content (OCR).
  */
 function searchCertificates(query) {
   const results = [];
-  // Escape single quotes for the query string
-  const sanitizedQuery = query.replace(/'/g, "\\'");
+  // Escape backslashes and single quotes for the query string.
+  const sanitizedQuery = query.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   
-  // Search logic: Content contains query OR Name contains query
-  // Note: 'fullText' includes the file content (indexable text) and title.
-  const searchParams = `fullText contains '${sanitizedQuery}' and trashed = false`;
-
   for (const position in DRIVE_FOLDER_IDS) {
     try {
       const folderId = DRIVE_FOLDER_IDS[position];
-      const folder = DriveApp.getFolderById(folderId);
-      const files = folder.searchFiles(searchParams);
+      // Refined query to include mimeType for better accuracy and performance.
+      const searchParams = `'${folderId}' in parents and fullText contains '${sanitizedQuery}' and (mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'application/pdf') and trashed = false`;
+      const files = DriveApp.searchFiles(searchParams);
       
       while (files.hasNext()) {
         const file = files.next();
-        const mimeType = file.getMimeType();
-         // Filter only images and PDFs
-        if (mimeType.indexOf('image/') === 0 || mimeType === MimeType.PDF) {
-           results.push(processFile(file, position));
-        }
+        // The mimeType check is now done in the query, so we can just process the file.
+        results.push(processFile(file, position));
       }
     } catch (e) {
       console.error(`Error searching folder ${position}: ${e}`);
@@ -132,7 +125,8 @@ function fetchAllCertificates() {
         const file = files.next();
         const mimeType = file.getMimeType();
         
-        if (mimeType.indexOf('image/') === 0 || mimeType === MimeType.PDF) {
+        // Correctly check for images and PDFs
+        if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
           allCertificates.push(processFile(file, position));
         }
       }

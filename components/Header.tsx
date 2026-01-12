@@ -18,7 +18,7 @@ const Header: React.FC = () => {
             <SchoolLogo className="h-14 w-14" />
             <div className="flex flex-col">
               <span className="text-lg font-semibold text-white leading-tight">ระบบค้นหาเกียรติบัตร</span>
-              <span className="text-sm text-slate-300 leading-tight">โรงเรียนกาฬสินธุ์ปัญญานุกูล</span>
+              <span className="text-sm text-slate-300 leading-tight">สำนักบริหารงานการศึกษาพิเศษ</span>
             </div>
           </div>
           <nav className="hidden md:flex items-center space-x-4">

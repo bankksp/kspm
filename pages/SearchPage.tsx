@@ -8,6 +8,20 @@ import ErrorMessage from '../components/ErrorMessage';
 import { fetchCertificates } from '../services/googleDrive';
 import type { Certificate } from '../types';
 import { SearchIcon } from '../components/icons/SearchIcon';
+import LargeResultsWarning from '../components/LargeResultsWarning';
+
+const LARGE_RESULT_THRESHOLD = 50;
+
+// ปรับปรุงคำที่ห้ามค้นหา: ลบคำเฉพาะเจาะจงออก เพื่อให้ค้นหา "กาฬสินธุ์" ได้ตามความต้องการ
+// เหลือไว้เฉพาะคำกลางๆ ที่อาจคืนค่าผลลัพธ์มหาศาลโดยไม่ตั้งใจ
+const COMMON_TEMPLATE_KEYWORDS = [
+  'โรงเรียน',
+  'สพป',
+  'สำนักงานเขตพื้นที่',
+  'การศึกษาพิเศษ',
+  'เกียรติบัตร',
+  'มอบให้ไว้'
+];
 
 const SearchPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,7 +33,16 @@ const SearchPage: React.FC = () => {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchTerm.trim()) return;
+    const term = searchTerm.trim();
+    if (!term) return;
+
+    // Smart Validation: ตรวจสอบคำค้นหาที่เป็นคำทั่วไป
+    if (COMMON_TEMPLATE_KEYWORDS.some(keyword => term === keyword)) {
+        setError(`คำว่า "${term}" เป็นคำทั่วไปที่ปรากฏในเกียรติบัตรแทบทุกใบ\n\nกรุณาระบุคำค้นที่เฉพาะเจาะจงมากขึ้น เช่น "ชื่อ-นามสกุล", "ชื่อกิจกรรม" ครับ`);
+        setResults([]);
+        setHasSearched(false);
+        return;
+    }
 
     setLoading(true);
     setError(null);
@@ -27,7 +50,7 @@ const SearchPage: React.FC = () => {
     setResults([]);
 
     try {
-      const data = await fetchCertificates(searchTerm);
+      const data = await fetchCertificates(term);
       setResults(data);
     } catch (err) {
       if (err instanceof Error) {
@@ -53,7 +76,7 @@ const SearchPage: React.FC = () => {
       return (
         <div className="py-20 animate-fade-in-up">
            <LoadingSpinner />
-           <p className="text-center text-slate-400 mt-4 animate-pulse">กำลังสแกนหาข้อมูลในเกียรติบัตร...</p>
+           <p className="text-center text-slate-400 mt-4 animate-pulse">กำลังค้นหาข้อความภายในไฟล์...</p>
         </div>
       );
     }
@@ -74,9 +97,9 @@ const SearchPage: React.FC = () => {
           </div>
           <h3 className="text-2xl font-bold text-white mb-3">ระบบค้นหาเกียรติบัตรอัจฉริยะ</h3>
           <p className="text-slate-400 max-w-lg mx-auto text-lg leading-relaxed">
-            ค้นหาด้วย <span className="text-sky-300 font-semibold">ชื่อ</span>, <span className="text-sky-300 font-semibold">นามสกุล</span> หรือ <span className="text-sky-300 font-semibold">ชื่อโรงเรียน</span>
+            ค้นหาด้วย <span className="text-sky-300 font-semibold">ชื่อ</span>, <span className="text-sky-300 font-semibold">นามสกุล</span>, <span className="text-sky-300 font-semibold">ชื่อโรงเรียน</span> หรือข้อความใดๆ
             <br />
-            ระบบจะทำการอ่านข้อความบนภาพเกียรติบัตรเพื่อค้นหาข้อมูลของคุณ
+            ระบบจะค้นหาข้อความจาก <span className="font-bold text-white">เนื้อหาภายในไฟล์เกียรติบัตร</span> โดยตรง
           </p>
         </div>
       );
@@ -85,6 +108,10 @@ const SearchPage: React.FC = () => {
     if (results.length > 0) {
       return (
         <div className="space-y-6 animate-fade-in-up">
+          {results.length > LARGE_RESULT_THRESHOLD && (
+            <LargeResultsWarning searchTerm={searchTerm} count={results.length} />
+          )}
+          
           <div className="flex items-center justify-between text-slate-300 bg-slate-800/40 px-6 py-3 rounded-lg border border-slate-700/50">
             <span className="font-medium">ผลการค้นหาสำหรับ "{searchTerm}"</span>
             <span className="bg-sky-500/20 text-sky-300 px-3 py-1 rounded-full text-sm font-bold border border-sky-500/30">
@@ -112,8 +139,7 @@ const SearchPage: React.FC = () => {
         </div>
         <p className="text-xl font-bold text-slate-300 mb-2">ไม่พบเกียรติบัตรที่ค้นหา</p>
         <p className="text-slate-500">
-            ลองค้นหาด้วยคำค้นอื่น หรือพิมพ์เพียงบางส่วนของชื่อ
-            <br/>(เช่น พิมพ์ชื่อโรงเรียน หรือ นามสกุล)
+            ลองตรวจสอบคำค้น หรือใช้ข้อความอื่นที่ปรากฏในเกียรติบัตร
         </p>
       </div>
     );
@@ -124,9 +150,9 @@ const SearchPage: React.FC = () => {
       <div className="container mx-auto max-w-6xl px-4 min-h-[80vh]">
         <div className="pt-8 pb-10 text-center relative">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-sky-500/20 blur-[100px] -z-10 rounded-full pointer-events-none"></div>
-          <h1 className="text-4xl sm:text-6xl font-bold text-white mb-4 drop-shadow-lg leading-tight tracking-tight">
+          <h1 className="text-3xl sm:text-5xl font-bold text-white mb-4 drop-shadow-lg leading-tight tracking-tight">
             ค้นหาเกียรติบัตร
-            <span className="block text-2xl sm:text-3xl font-medium text-sky-400 mt-2">โรงเรียนกาฬสินธุ์ปัญญานุกูล</span>
+            <span className="block text-2xl sm:text-3xl font-medium text-sky-400 mt-2">สำนักบริหารงานการศึกษาพิเศษ</span>
           </h1>
         </div>
 
@@ -136,7 +162,7 @@ const SearchPage: React.FC = () => {
                 <SearchInput
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="พิมพ์ชื่อจริง, นามสกุล หรือ โรงเรียน..."
+                  placeholder="พิมพ์ชื่อ, นามสกุล หรือ โรงเรียน..."
                 />
                 <button 
                   type="submit"
@@ -155,9 +181,9 @@ const SearchPage: React.FC = () => {
              </div>
           </form>
           <div className="mt-4 flex justify-center gap-4 text-sm text-slate-400">
-             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400"></span> ค้นหาจากรูปภาพ</span>
+             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400"></span> ค้นหาจากเนื้อหาในไฟล์</span>
              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span> รองรับชื่อบางส่วน</span>
-             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span> รวดเร็วแม่นยำ</span>
+             <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span> ขับเคลื่อนโดย Google Drive</span>
           </div>
         </div>
 
