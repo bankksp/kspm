@@ -8,8 +8,8 @@ declare global {
   }
 
   interface Window {
-    // FIX: Removed `readonly` modifier to ensure all declarations of 'aistudio' have identical modifiers.
-    aistudio: AIStudio;
+    // FIX: Added the `readonly` modifier to resolve the error "All declarations of 'aistudio' must have identical modifiers."
+    readonly aistudio: AIStudio;
   }
 }
 

@@ -59,8 +59,10 @@ const BrowsePage: React.FC<BrowsePageProps> = ({ certificates }) => {
     <>
       <div className="container mx-auto px-4">
         <div className="text-center pt-8 pb-12">
-          <h1 className="text-4xl sm:text-5xl font-bold text-white mb-2">คลังเกียรติบัตรทั้งหมด</h1>
-          <p className="text-lg text-slate-300">เลือกดูและกรองเกียรติบัตรตามตำแหน่ง ({certificates.length} รายการ)</p>
+          <h1 className="text-4xl sm:text-5xl font-bold text-white mb-2">คลังเกียรติบัตรโรงเรียน</h1>
+          <p className="text-lg text-slate-300">
+            เลือกดูเกียรติบัตรทั้งหมดของโรงเรียน ({certificates.length} รายการ)
+          </p>
         </div>
 
         <FilterPills

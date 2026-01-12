@@ -100,8 +100,8 @@ const SearchPage: React.FC = () => {
            <div className="inline-block p-5 bg-slate-800/50 rounded-full mb-4">
              <SearchIcon className="h-12 w-12 text-slate-600"/>
           </div>
-          <p className="text-xl">กรอกชื่อ-นามสกุลของคุณเพื่อค้นหาเกียรติบัตร</p>
-          <p className="text-slate-400">ระบบจะค้นหาจากข้อมูลที่ปรากฏบนเอกสาร</p>
+          <p className="text-xl">เริ่มต้นค้นหาโดยพิมพ์คำที่เกี่ยวข้องในช่องด้านบน</p>
+          <p className="text-slate-400">คุณสามารถใช้เพียงส่วนหนึ่งของชื่อหรือนามสกุลได้</p>
       </div>
     );
   };
@@ -111,14 +111,21 @@ const SearchPage: React.FC = () => {
       <div className="container mx-auto max-w-4xl text-center px-4">
         <div className="pt-8 pb-12">
           <h1 className="text-4xl sm:text-5xl font-bold text-white mb-2">ค้นหาเกียรติบัตร</h1>
-          <p className="text-lg text-slate-300">กรอกชื่อ-นามสกุลที่ปรากฏบนเกียรติบัตรเพื่อค้นหา</p>
+          <p className="text-lg text-slate-300">
+            ค้นหาเกียรติบัตรของโรงเรียน
+            <br className="hidden sm:block" />
+            เพียงพิมพ์ส่วนหนึ่งของชื่อ, นามสกุล, หรือข้อความที่ต้องการเพื่อค้นหา
+          </p>
+          <p className="text-sm text-slate-400 mt-2">
+            (หมายเหตุ: การค้นหาข้อความบนรูปภาพอาจใช้เวลาประมวลผลจาก Google Drive)
+          </p>
         </div>
         
         <form onSubmit={handleSearch} className="max-w-2xl mx-auto mb-12 flex gap-2">
           <SearchInput
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="เช่น สมชาย ใจดี"
+            placeholder="ค้นหาจากชื่อ, นามสกุล, หรือข้อความ..."
           />
           <button type="submit" disabled={isLoading} className="bg-sky-500 text-white font-semibold px-6 py-2 rounded-full hover:bg-sky-600 transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center">
               {isLoading ? '...' : 'ค้นหา'}

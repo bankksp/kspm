@@ -86,7 +86,8 @@ function fetchAllCertificates() {
 
 /**
  * Searches for certificates and processes them to use Base64 data URLs.
- * @param {string} query - The text to search for within the images.
+ * The search now includes both full text (image content) and the file name.
+ * @param {string} query - The text to search for.
  * @returns {Array<object>} An array of matching certificate objects.
  */
 function searchCertificatesByText(query) {
@@ -96,8 +97,12 @@ function searchCertificatesByText(query) {
       return acc;
   }, {});
 
+  // Sanitize query to handle single quotes in names (e.g., O'Malley)
+  const sanitizedQuery = query.replace(/'/g, "\\'");
+
   const parentQuery = folderIds.map(id => `'${id}' in parents`).join(' or ');
-  const searchQuery = `fullText contains '${query}' and (${parentQuery}) and mimeType = 'image/png' and trashed = false`;
+  // Updated query to search in both file name and full text content
+  const searchQuery = `(fullText contains '${sanitizedQuery}' or name contains '${sanitizedQuery}') and (${parentQuery}) and mimeType = 'image/png' and trashed = false`;
   
   const files = DriveApp.searchFiles(searchQuery);
   const certificates = [];
@@ -111,6 +116,7 @@ function searchCertificatesByText(query) {
   }
   return certificates;
 }
+
 
 /**
  * Processes a Drive file into a structured certificate object.
