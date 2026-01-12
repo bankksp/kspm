@@ -86,7 +86,7 @@ const BrowsePage: React.FC = () => {
         <div className="text-center pt-8 pb-10">
           <h1 className="text-3xl sm:text-5xl font-bold text-white mb-3">คลังเกียรติบัตรทั้งหมด</h1>
           <p className="text-lg text-slate-300">
-            รวบรวมเกียรติบัตรทั้งหมดของบุคลากรโรงเรียนกาฬสินธุ์ปัญญานุกูล
+            รวบรวมเกียรติบัตรทั้งหมดของผู้อำนวยการ รองผู้อำนวยการ ครู ดีเด่น
           </p>
         </div>
 
