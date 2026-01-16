@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import SearchInput from '../components/SearchInput';
 import CertificateCard from '../components/CertificateCard';
@@ -11,17 +10,6 @@ import { SearchIcon } from '../components/icons/SearchIcon';
 import LargeResultsWarning from '../components/LargeResultsWarning';
 
 const LARGE_RESULT_THRESHOLD = 50;
-
-// ปรับปรุงคำที่ห้ามค้นหา: ลบคำเฉพาะเจาะจงออก เพื่อให้ค้นหา "กาฬสินธุ์" ได้ตามความต้องการ
-// เหลือไว้เฉพาะคำกลางๆ ที่อาจคืนค่าผลลัพธ์มหาศาลโดยไม่ตั้งใจ
-const COMMON_TEMPLATE_KEYWORDS = [
-  'โรงเรียน',
-  'สพป',
-  'สำนักงานเขตพื้นที่',
-  'การศึกษาพิเศษ',
-  'เกียรติบัตร',
-  'มอบให้ไว้'
-];
 
 const SearchPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,14 +24,6 @@ const SearchPage: React.FC = () => {
     const term = searchTerm.trim();
     if (!term) return;
 
-    // Smart Validation: ตรวจสอบคำค้นหาที่เป็นคำทั่วไป
-    if (COMMON_TEMPLATE_KEYWORDS.some(keyword => term === keyword)) {
-        setError(`คำว่า "${term}" เป็นคำทั่วไปที่ปรากฏในเกียรติบัตรแทบทุกใบ\n\nกรุณาระบุคำค้นที่เฉพาะเจาะจงมากขึ้น เช่น "ชื่อ-นามสกุล", "ชื่อกิจกรรม" ครับ`);
-        setResults([]);
-        setHasSearched(false);
-        return;
-    }
-
     setLoading(true);
     setError(null);
     setHasSearched(true);
@@ -51,7 +31,7 @@ const SearchPage: React.FC = () => {
 
     try {
       const data = await fetchCertificates(term);
-      setResults(data);
+      setResults(data.certificates);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);

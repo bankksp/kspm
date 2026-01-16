@@ -20,51 +20,35 @@ function doGet(e) {
     const params = e.parameter;
     const action = params.action;
 
-    // --- NEW: Handle Maintenance Status ---
-    
-    // 1. Get Maintenance Status
+    // --- Handle Maintenance Status ---
     if (action === 'getMaintenanceStatus') {
       const props = PropertiesService.getScriptProperties();
-      // Default to 'false' if not set
       const status = props.getProperty('MAINTENANCE_MODE') === 'true';
       return createJsonResponse({ maintenance: status });
     }
 
-    // 2. Set Maintenance Status
     if (action === 'setMaintenanceStatus') {
       const mode = params.mode; // 'true' or 'false'
       PropertiesService.getScriptProperties().setProperty('MAINTENANCE_MODE', mode);
       return createJsonResponse({ success: true, maintenance: mode === 'true' });
     }
-
     // --- End Maintenance Logic ---
 
     const query = params.query;
 
-    // If there is a search query, perform a server-side search (no caching for search results)
     if (query && query.trim() !== '') {
+      // Search logic is not paginated, returns all results
       const searchResults = searchCertificates(query);
       return createJsonResponse(searchResults);
     }
 
-    // If no query (Browse All), use cache
-    const cache = CacheService.getScriptCache();
-    const cacheKey = 'all_certificates_v6'; // Bump version
-    const cached = cache.get(cacheKey);
+    // BROWSE logic is paginated for performance
+    const limit = parseInt(params.limit, 10) || 30; // Default page size
+    const offset = parseInt(params.offset, 10) || 0;
+    const position = params.position;
 
-    if (cached) {
-      return createJsonResponse(JSON.parse(cached));
-    }
-
-    const certificates = fetchAllCertificates();
-    
-    try {
-      cache.put(cacheKey, JSON.stringify(certificates), 600); // 10 minutes
-    } catch(err) {
-      console.warn("Cache write failed: " + err);
-    }
-    
-    return createJsonResponse(certificates);
+    const paginatedData = fetchCertificatesByPage(limit, offset, position);
+    return createJsonResponse(paginatedData);
       
   } catch (error) {
     console.error(`Error in doGet: ${error.toString()}`);
@@ -82,63 +66,99 @@ function createJsonResponse(data) {
 }
 
 /**
- * Searches for files containing the query text within specific folders.
- * Uses 'fullText contains' to search inside file content (OCR).
+ * Searches for files and returns all results. Not paginated.
+ * Returns data in the new standard object format.
  */
 function searchCertificates(query) {
   const results = [];
-  // Escape backslashes and single quotes for the query string.
   const sanitizedQuery = query.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
   
-  for (const position in DRIVE_FOLDER_IDS) {
-    try {
-      const folderId = DRIVE_FOLDER_IDS[position];
-      // Refined query to include mimeType for better accuracy and performance.
-      const searchParams = `'${folderId}' in parents and fullText contains '${sanitizedQuery}' and (mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'application/pdf') and trashed = false`;
-      const files = DriveApp.searchFiles(searchParams);
-      
-      while (files.hasNext()) {
-        const file = files.next();
-        // The mimeType check is now done in the query, so we can just process the file.
-        results.push(processFile(file, position));
-      }
-    } catch (e) {
-      console.error(`Error searching folder ${position}: ${e}`);
-    }
-  }
+  const folderIdToPosition = Object.entries(DRIVE_FOLDER_IDS).reduce((acc, [pos, id]) => {
+    acc[id] = pos; return acc;
+  }, {});
   
-  // Sort by name
-  results.sort((a, b) => a.name.localeCompare(b.name, 'th'));
-  return results;
-}
+  const folderClauses = Object.values(DRIVE_FOLDER_IDS).map(id => `'${id}' in parents`);
+  const searchParams = `(${folderClauses.join(' or ')}) and (fullText contains '${sanitizedQuery}' or title contains '${sanitizedQuery}') and (mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'application/pdf') and trashed = false`;
 
-function fetchAllCertificates() {
-  const allCertificates = [];
-  
-  for (const position in DRIVE_FOLDER_IDS) {
-    const folderId = DRIVE_FOLDER_IDS[position];
-    try {
-      const folder = DriveApp.getFolderById(folderId);
-      const files = folder.getFiles(); 
-      
-      while (files.hasNext()) {
-        const file = files.next();
-        const mimeType = file.getMimeType();
-        
-        // Correctly check for images and PDFs
-        if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
-          allCertificates.push(processFile(file, position));
+  try {
+    const files = DriveApp.searchFiles(searchParams);
+    while (files.hasNext()) {
+      const file = files.next();
+      const parents = file.getParents();
+      let position = null;
+      while (parents.hasNext()) {
+        const parent = parents.next();
+        const parentId = parent.getId();
+        if (folderIdToPosition[parentId]) {
+          position = folderIdToPosition[parentId];
+          break; 
         }
       }
-    } catch (e) {
-      console.error(`Error processing folder ${position}: ${e}`);
+      if (position) {
+        results.push(processFile(file, position));
+      }
     }
+  } catch (e) {
+    console.error(`Error searching with query '${query}': ${e}`);
   }
   
-  allCertificates.sort((a, b) => a.name.localeCompare(b.name, 'th'));
-  
-  return allCertificates;
+  results.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+  return { certificates: results, hasNextPage: false };
 }
+
+/**
+ * Fetches certificates page by page for the 'Browse All' view.
+ */
+function fetchCertificatesByPage(limit, offset, positionFilter) {
+  const results = [];
+  const folderIdToPosition = Object.entries(DRIVE_FOLDER_IDS).reduce((acc, [pos, id]) => {
+    acc[id] = pos; return acc;
+  }, {});
+
+  let folderClauses;
+  if (positionFilter && positionFilter !== 'ทั้งหมด' && DRIVE_FOLDER_IDS[positionFilter]) {
+    folderClauses = [`'${DRIVE_FOLDER_IDS[positionFilter]}' in parents`];
+  } else {
+    folderClauses = Object.values(DRIVE_FOLDER_IDS).map(id => `'${id}' in parents`);
+  }
+
+  const searchParams = `(${folderClauses.join(' or ')}) and (mimeType = 'image/jpeg' or mimeType = 'image/png' or mimeType = 'application/pdf') and trashed = false`;
+
+  try {
+    const files = DriveApp.searchFiles(searchParams);
+
+    // Manual offset skip since the API doesn't support it directly
+    for (let i = 0; i < offset && files.hasNext(); i++) {
+      files.next();
+    }
+
+    // Fetch items for the current page
+    for (let i = 0; i < limit && files.hasNext(); i++) {
+      const file = files.next();
+      const parents = file.getParents();
+      let position = null;
+      while (parents.hasNext()) {
+        const parent = parents.next();
+        const parentId = parent.getId();
+        if (folderIdToPosition[parentId]) {
+          position = folderIdToPosition[parentId];
+          break;
+        }
+      }
+      if (position) {
+        results.push(processFile(file, position));
+      }
+    }
+
+    const hasNextPage = files.hasNext();
+    return { certificates: results, hasNextPage: hasNextPage };
+
+  } catch (e) {
+    console.error(`Error in fetchCertificatesByPage: ${e}`);
+    return { certificates: [], hasNextPage: false, error: e.toString() };
+  }
+}
+
 
 function processFile(file, position) {
   const fileId = file.getId();

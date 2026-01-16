@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { Position } from '../types';
 
@@ -6,7 +5,7 @@ interface FilterPillsProps {
   positions: (Position | 'ทั้งหมด')[];
   activeFilter: Position | 'ทั้งหมด';
   onFilterChange: (filter: Position | 'ทั้งหมด') => void;
-  counts: Record<Position | 'ทั้งหมด', number>;
+  counts?: Record<Position | 'ทั้งหมด', number>;
 }
 
 const FilterPills: React.FC<FilterPillsProps> = ({ positions, activeFilter, onFilterChange, counts }) => {
@@ -24,13 +23,15 @@ const FilterPills: React.FC<FilterPillsProps> = ({ positions, activeFilter, onFi
             }`}
         >
           {position}
-          <span
-            className={`ml-2.5 text-xs px-2 py-0.5 rounded-full transition-colors ${
-              activeFilter === position ? 'bg-white/20' : 'bg-slate-700 text-slate-200'
-            }`}
-          >
-            {counts[position] ?? 0}
-          </span>
+          {counts && (
+            <span
+              className={`ml-2.5 text-xs px-2 py-0.5 rounded-full transition-colors ${
+                activeFilter === position ? 'bg-white/20' : 'bg-slate-700 text-slate-200'
+              }`}
+            >
+              {counts[position] ?? 0}
+            </span>
+          )}
         </button>
       ))}
     </div>
